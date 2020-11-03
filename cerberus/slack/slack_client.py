@@ -23,12 +23,23 @@ def initialize_slack_client():
 
 # Post messages and failures in slack
 def post_message_in_slack(slack_message, thread_ts=None):
-    slack_client.chat_postMessage(
-        channel=slack_channel_ID,
-        link_names=True,
-        text=slack_message,
-        thread_ts=thread_ts
-    )
+    max_retries = 10
+    for i in range(max_retries):
+        try:
+            slack_client.chat_postMessage(
+                channel=slack_channel_ID,
+                link_names=True,
+                text=slack_message,
+                thread_ts=thread_ts)
+        except SlackApiError as e:
+            if e.response["error"] == "ratelimited":
+                # The `Retry-After` header reports how long to wait before retrying
+                delay = int(e.response.headers['Retry-After'])
+                logging.info("Rate limited. Retrying in {delay} seconds")
+                time.sleep(delay)
+            else:
+               # other errors
+               raise e
 
 
 # Get members of a channel
